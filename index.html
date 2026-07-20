@@ -36,7 +36,7 @@
 
   <section class="grid-2" style="margin-bottom:16px">
     <div class="card panel"><h3>Seats by party</h3><p class="hint">Click a slice to list those members</p><div class="chart-box tall"><canvas id="partyChart"></canvas></div></div>
-    <div class="card panel"><h3>Average declared assets by party</h3><p class="hint">₹ crore, from affidavits</p><div class="chart-box tall"><canvas id="assetChart"></canvas></div></div>
+    <div class="card panel"><h3>Assets by party (average)</h3><p class="hint">₹ crore · hover a bar for average and median</p><div class="chart-box tall"><canvas id="assetChart"></canvas></div></div>
   </section>
 
   <section class="grid-2" style="margin-bottom:16px">
@@ -138,6 +138,8 @@ function render(scope){
   const withCases=base.filter(m=>(m.criminal_cases||0)>0);
   const totalCases=withCasesField.reduce((s,m)=>s+m.criminal_cases,0);
   const avgAssets=withAssets.length?withAssets.reduce((s,m)=>s+m.assets_total_inr,0)/withAssets.length:0;
+  const medAssets=median(withAssets.map(m=>m.assets_total_inr));
+  const medCases=median(withCasesField.map(m=>m.criminal_cases));
 
   const ls=MPS.filter(m=>m.house==="Lok Sabha").length, rs=MPS.filter(m=>m.house==="Rajya Sabha").length;
   document.getElementById("cov").textContent = scope==="all"
@@ -147,8 +149,8 @@ function render(scope){
   /* KPIs */
   const kpis=[
     {lab:"Members",val:base.length,sub:scope==="all"?"whole Parliament":scope,col:"var(--navy)",list:()=>base,right:m=>m.party},
-    {lab:"Avg. declared assets",val:fmtCrore(avgAssets),sub:withAssets.length+" with data",col:"var(--saffron)",list:()=>[...withAssets].sort((a,b)=>b.assets_total_inr-a.assets_total_inr),right:m=>fmtCrore(m.assets_total_inr)},
-    {lab:"Avg. cases per member",val:withCasesField.length?(totalCases/withCasesField.length).toFixed(1):"—",sub:totalCases+" cases declared",col:"#c2410c",list:()=>[...withCases].sort((a,b)=>b.criminal_cases-a.criminal_cases),right:m=>m.criminal_cases+" cases"},
+    {lab:"Declared assets",val:fmtCrore(avgAssets),sub:"avg · median "+fmtCrore(medAssets),col:"var(--saffron)",list:()=>[...withAssets].sort((a,b)=>b.assets_total_inr-a.assets_total_inr),right:m=>fmtCrore(m.assets_total_inr)},
+    {lab:"Criminal cases / member",val:withCasesField.length?(totalCases/withCasesField.length).toFixed(1):"—",sub:"avg · median "+(medCases==null?"—":medCases)+" · "+totalCases+" total",col:"#c2410c",list:()=>[...withCases].sort((a,b)=>b.criminal_cases-a.criminal_cases),right:m=>m.criminal_cases+" cases"},
     {lab:"With pending cases",val:withCases.length,sub:withCasesField.length?Math.round(withCases.length/withCasesField.length*100)+"% of those with data":"",col:"#b91c1c",list:()=>[...withCases].sort((a,b)=>b.criminal_cases-a.criminal_cases),right:m=>m.criminal_cases+" cases"},
   ];
   document.getElementById("kpis").innerHTML=kpis.map((k,i)=>`<div class="card kpi clickable" data-i="${i}"><div class="accent" style="background:${k.col}"></div><div class="lab">${k.lab}</div><div class="val">${k.val}</div><div class="sub">${k.sub}</div></div>`).join("");
@@ -163,8 +165,9 @@ function render(scope){
       onClick:(e,el)=>{if(el.length){const p=topP[el[0].index];openModal("Party: "+p,byParty[p],m=>fmtCrore(m.assets_total_inr));}}}});
 
   const aP=parties.filter(p=>byParty[p].some(m=>m.assets_total_inr!=null)).slice(0,14);
+  const aMed=aP.map(p=>{const v=byParty[p].filter(m=>m.assets_total_inr!=null).map(m=>m.assets_total_inr);const md=median(v);return md==null?0:md/1e7;});
   mk("assetChart",{type:"bar",data:{labels:aP,datasets:[{data:aP.map(p=>{const a=byParty[p].filter(m=>m.assets_total_inr!=null);return a.length?(a.reduce((s,m)=>s+m.assets_total_inr,0)/a.length)/1e7:0;}),backgroundColor:aP.map(p=>PARTY_COLORS[p]||"#64748b"),borderRadius:5}]},
-    options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`₹${c.parsed.x.toFixed(1)} Cr avg`}}},scales:{x:{beginAtZero:true,ticks:{callback:v=>"₹"+v}}},maintainAspectRatio:false,
+    options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`₹${c.parsed.x.toFixed(1)} Cr avg`,afterLabel:c=>`median ₹${aMed[c.dataIndex].toFixed(1)} Cr`}}},scales:{x:{beginAtZero:true,ticks:{callback:v=>"₹"+v}}},maintainAspectRatio:false,
       onClick:(e,el)=>{if(el.length){const p=aP[el[0].index];openModal("Party: "+p,[...byParty[p]].sort((a,b)=>(b.assets_total_inr||0)-(a.assets_total_inr||0)),m=>fmtCrore(m.assets_total_inr));}}}});
 
   /* case types */

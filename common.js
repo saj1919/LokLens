@@ -7,6 +7,8 @@ function fmtCrore(inr){
   return "₹"+(inr/1e5).toLocaleString("en-IN",{maximumFractionDigits:1})+" L";
 }
 function fmtNum(n){ return (n===null||n===undefined)?"N/A":n.toLocaleString("en-IN"); }
+function median(nums){ const a=nums.filter(n=>n!=null).slice().sort((x,y)=>x-y); if(!a.length) return null; const m=Math.floor(a.length/2); return a.length%2?a[m]:(a[m-1]+a[m])/2; }
+function mean(nums){ const a=nums.filter(n=>n!=null); return a.length?a.reduce((s,n)=>s+n,0)/a.length:null; }
 function initials(name){ const p=(name||"").trim().split(/\s+/); return ((p[0]?.[0]||"")+(p[p.length-1]?.[0]||"")).toUpperCase(); }
 
 /* ---------- Photos: baked (prominent) + live Wikipedia resolution ---------- */
