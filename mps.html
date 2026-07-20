@@ -23,7 +23,8 @@
 <main class="wrap">
   <div class="controls">
     <div class="field"><label for="search">Search</label><input type="text" id="search" placeholder="Name, party, state or constituency…" autocomplete="off"></div>
-    <div class="field" style="max-width:200px"><label for="stateF">State / UT</label><select id="stateF"></select></div>
+    <div class="field" style="max-width:160px"><label for="houseF">House</label><select id="houseF"><option value="">Both Houses</option><option value="Lok Sabha">Lok Sabha</option><option value="Rajya Sabha">Rajya Sabha</option></select></div>
+    <div class="field" style="max-width:190px"><label for="stateF">State / UT</label><select id="stateF"></select></div>
     <div class="field" style="max-width:170px"><label for="partyF">Party</label><select id="partyF"></select></div>
     <div class="field" style="max-width:170px"><label for="occF">Occupation</label><select id="occF"></select></div>
   </div>
@@ -47,9 +48,10 @@ const sorted=[...MPS].sort((a,b)=>a.name.localeCompare(b.name));
 const params=new URLSearchParams(location.search);
 let current=params.get("id")||sorted[0].id;
 if(!MPS.find(m=>m.id===current)) current=sorted[0].id;
-let fText=params.get("q")||"", fState="", fParty="", fOcc="";
+let fText=params.get("q")||"", fState="", fParty="", fOcc="", fHouse=params.get("house")||"";
 
-const stateF=document.getElementById("stateF"), partyF=document.getElementById("partyF"), occF=document.getElementById("occF"), searchB=document.getElementById("search");
+const houseF=document.getElementById("houseF"), stateF=document.getElementById("stateF"), partyF=document.getElementById("partyF"), occF=document.getElementById("occF"), searchB=document.getElementById("search");
+if(fHouse) houseF.value=fHouse;
 stateF.innerHTML='<option value="">All states</option>'+[...new Set(MPS.map(m=>m.state))].sort().map(s=>`<option>${s}</option>`).join("");
 partyF.innerHTML='<option value="">All parties</option>'+[...new Set(MPS.map(m=>m.party))].sort().map(p=>`<option>${p}</option>`).join("");
 const allOcc=[...new Set(MPS.flatMap(m=>occTags(m)))].sort((a,b)=>occLabel(a).localeCompare(occLabel(b)));
@@ -57,6 +59,7 @@ occF.innerHTML='<option value="">Any occupation</option>'+allOcc.map(o=>`<option
 searchB.value=fText;
 
 function matches(m){
+  if(fHouse&&m.house!==fHouse) return false;
   if(fState&&m.state!==fState) return false;
   if(fParty&&m.party!==fParty) return false;
   if(fOcc&&!occTags(m).includes(fOcc)) return false;
@@ -69,7 +72,7 @@ function renderList(){
   document.getElementById("mpList").innerHTML=list.length? list.map(m=>`
     <div class="mp-item ${m.id===current?"active":""}" data-id="${m.id}">
       ${avatarHTML(m,42)}
-      <div><div class="nm">${m.name}</div><div class="cn">${m.party} · ${m.constituency}</div></div>
+      <div><div class="nm">${m.name} <span class="house-badge ${m.house==="Lok Sabha"?"ls":"rs"}">${m.house==="Lok Sabha"?"LS":"RS"}</span></div><div class="cn">${m.party} · ${m.constituency}</div></div>
       <span class="dot" style="background:${partyColor(m)}"></span>
     </div>`).join("") : `<div class="empty" style="padding:16px">No MPs match.</div>`;
   document.querySelectorAll(".mp-item").forEach(el=>el.onclick=()=>{current=el.dataset.id;renderList();renderProfile();});
@@ -88,8 +91,9 @@ function renderProfile(){
      <div class="who"><h2>${m.name}</h2>
        <p class="role">${m.positions||m.profession||m.one_liner||"Member of Parliament, Lok Sabha"}</p>
        <div class="meta">
+         <span class="house-badge ${m.house==="Lok Sabha"?"ls":"rs"}">${m.house||"Lok Sabha"}</span>
          <span class="pill" style="background:${partyColor(m)}">${m.party_full||m.party}</span>
-         <span class="tag">${m.constituency}, ${m.state}</span>
+         <span class="tag">${m.house==="Rajya Sabha"?(m.nominated?"Nominated":m.state):m.constituency+", "+m.state}</span>
          ${m.age?`<span class="tag">Age ${m.age}</span>`:""}${m.gender?`<span class="tag">${m.gender}</span>`:""}
          ${occTags(m).map(t=>`<span class="tag" style="background:#e0f2fe;color:#0c4a6e">${occLabel(t)}</span>`).join("")}
        </div>
@@ -114,6 +118,7 @@ function renderProfile(){
      e.margin!=null?"won by "+fmtNum(e.margin):null, e.runner_up?"over "+e.runner_up+(e.runner_up_party?" ("+e.runner_up_party+")":""):null
     ].filter(Boolean).join(" · ");
     html+=block("🗳️ 2024 election result", `<p>${line||'<span class="empty">Not available.</span>'}</p>`); }
+  if(m.house==="Rajya Sabha") html+=block("🏛️ Rajya Sabha", `<dl class="kv"><dt>Represents</dt><dd>${m.nominated?"Nominated member (President's nominee)":m.state}</dd>${m.term_ends?`<dt>Term ends</dt><dd>${m.term_ends}</dd>`:""}</dl>`);
 
   html+=block("💰 Assets & liabilities",`<dl class="kv">
      <dt>Total assets</dt><dd>${fmtCrore(m.assets_total_inr)}</dd>
@@ -134,6 +139,7 @@ function renderProfile(){
   el.innerHTML=html;
   hydratePhotos([m]);
 }
+houseF.onchange=()=>{fHouse=houseF.value;renderList();};
 stateF.onchange=()=>{fState=stateF.value;renderList();};
 partyF.onchange=()=>{fParty=partyF.value;renderList();};
 occF.onchange=()=>{fOcc=occF.value;renderList();};

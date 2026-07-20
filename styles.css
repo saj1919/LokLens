@@ -125,6 +125,15 @@ select:focus,input:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 
 .empty{color:var(--muted);font-size:.86rem;font-style:italic}
 .disclaimer{font-size:.78rem;color:var(--muted);background:#fffdf5;border:1px solid #f0e6c8;border-radius:10px;padding:12px 14px;margin-top:14px}
 
+/* House toggle */
+.house-toggle{display:inline-flex;background:#eef1f6;border:1px solid var(--line);border-radius:12px;padding:5px;gap:4px;margin:18px 0 4px;flex-wrap:wrap}
+.house-toggle button{border:0;background:transparent;padding:9px 18px;border-radius:8px;font-weight:700;font-size:.9rem;cursor:pointer;color:var(--muted)}
+.house-toggle button.active{background:var(--navy);color:#fff;box-shadow:var(--shadow)}
+.house-toggle button:hover:not(.active){background:#e2e8f2;color:var(--navy)}
+.house-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.68rem;font-weight:700;letter-spacing:.3px}
+.house-badge.ls{background:#fff2e6;color:#b45309}
+.house-badge.rs{background:#e6f0ff;color:#1d4ed8}
+
 /* Clickable stat affordance */
 .clickable{cursor:pointer;transition:transform .08s ease, box-shadow .12s ease}
 .clickable:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
