@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LokLens — Lok Sabha MP Stats & Infographics</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site-head">
+  <div class="wrap">
+    <div class="brand">
+      <div class="emblem">🏛️</div>
+      <div><h1>LokLens</h1><p>18th Lok Sabha (2024) — MP transparency dashboard</p></div>
+    </div>
+    <nav class="tabs">
+      <a href="index.html" class="active">Stats & Infographics</a>
+      <a href="mps.html">Find an MP</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h2>All 543 Members of the 18th Lok Sabha</h2>
+    <p>Every stat below is clickable — open it to see the MPs behind the number and jump into any profile.
+       Figures are self-declared 2024 election affidavits (MyNeta/ADR), with the Election Commission and Wikipedia. <strong id="cov"></strong></p>
+  </section>
+
+  <section class="kpi-grid" id="kpis"></section>
+
+  <section class="grid-2" style="margin-bottom:16px">
+    <div class="card panel"><h3>Seats by party</h3><p class="hint">Click a slice to list those MPs</p><div class="chart-box tall"><canvas id="partyChart"></canvas></div></div>
+    <div class="card panel"><h3>Average declared assets by party</h3><p class="hint">₹ crore, from 2024 affidavits</p><div class="chart-box tall"><canvas id="assetChart"></canvas></div></div>
+  </section>
+
+  <section class="grid-2" style="margin-bottom:16px">
+    <div class="card panel"><h3>Types of pending criminal cases</h3><p class="hint">MPs per category (from declared IPC sections in profiled cases). Click a bar. Allegations, not convictions.</p><div class="chart-box tall"><canvas id="caseTypeChart"></canvas></div></div>
+    <div class="card panel"><h3>Highest qualification declared</h3><p class="hint">Across all 543. Click a bar to list MPs</p><div class="chart-box tall"><canvas id="eduChart"></canvas></div></div>
+  </section>
+
+  <section class="grid-3" style="margin-bottom:16px">
+    <div class="card panel"><h3>Richest MPs</h3><p class="hint">By declared net worth</p><ol class="rank-list" id="richList"></ol></div>
+    <div class="card panel"><h3>Most pending criminal cases</h3><p class="hint">Self-declared — allegations, not convictions</p><ol class="rank-list" id="caseList"></ol></div>
+    <div class="card panel"><h3>Highest liabilities</h3><p class="hint">Declared loans/liabilities</p><ol class="rank-list" id="liabList"></ol></div>
+  </section>
+
+  <section class="card panel" style="margin-bottom:16px">
+    <h3>Occupations beyond politics</h3>
+    <p class="hint">MPs by prior or parallel profession, from Wikipedia (most are also "politician", excluded here). Click a bar to list them.</p>
+    <div class="chart-box tall"><canvas id="occChart"></canvas></div>
+  </section>
+
+  <section style="margin:26px 0 6px">
+    <h2 class="section-title">Deep-profile insights <span class="tag" id="subsetTag"></span></h2>
+    <p class="section-sub">These require detailed biographies (family, foreign study, dynasty) that we currently hold for a curated subset of high-profile MPs. Clearly separated from the all-543 figures above. Every tile is clickable.</p>
+  </section>
+
+  <section class="kpi-grid" id="deepKpis"></section>
+
+  <section class="grid-2" style="margin:16px 0">
+    <div class="card panel"><h3>Education: India vs. abroad</h3><p class="hint">Among profiled MPs with detailed education. Click to list</p><div class="chart-box"><canvas id="eduOriginChart"></canvas></div></div>
+    <div class="card panel">
+      <h3>Children / grandchildren education</h3>
+      <p class="hint">Where an MP's child/grandchild's study is publicly reported — India vs abroad. Coverage is intentionally sparse (rarely public).</p>
+      <div class="stat-row" id="childEduStats" style="grid-template-columns:1fr 1fr 1fr"></div>
+      <div id="childEduList" style="margin-top:12px;font-size:.86rem"></div>
+    </div>
+  </section>
+
+  <div class="disclaimer" id="disclaimer"></div>
+</main>
+
+<footer class="site-foot"><div class="wrap">
+  <span>LokLens · Built for transparency, not endorsement.</span>
+  <span>Sources: MyNeta/ADR · Election Commission of India · Wikipedia · press reports</span>
+</div></footer>
+
+<div class="modal-back" id="modalBack">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modalTitle"></h3><span class="cnt" id="modalCnt"></span><button class="modal-close" id="modalClose">×</button></div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="data_full.js"></script>
+<script src="photos.js"></script>
+<script src="common.js"></script>
+<script>
+const N=MPS.length;
+const profiled=MPS.filter(m=>m.rich);
+const withAssets=MPS.filter(m=>m.assets_total_inr!=null);
+const withCasesField=MPS.filter(m=>m.criminal_cases!=null);
+const withCases=MPS.filter(m=>(m.criminal_cases||0)>0);
+const totalCases=withCasesField.reduce((s,m)=>s+m.criminal_cases,0);
+document.getElementById("cov").textContent=`Affidavit data resolved for ${withAssets.length}/${N} MPs; detailed profiles for ${profiled.length}.`;
+document.getElementById("disclaimer").textContent=DATA_META.disclaimer;
+document.getElementById("subsetTag").textContent=profiled.length+" profiled MPs";
+
+/* ---------- modal ---------- */
+const back=document.getElementById("modalBack");
+function openModal(title, list, rightFn){
+  document.getElementById("modalTitle").textContent=title;
+  document.getElementById("modalCnt").textContent=list.length+" MP"+(list.length!==1?"s":"");
+  document.getElementById("modalBody").innerHTML = list.length? list.map(m=>`
+    <a class="mrow" href="mps.html?id=${encodeURIComponent(m.id)}">
+      ${avatarHTML(m,38)}
+      <div><div class="nm">${m.name}</div><div class="cn">${m.party} · ${m.constituency}, ${m.state}</div></div>
+      ${rightFn?`<span class="rt">${rightFn(m)}</span>`:`<span class="dot" style="background:${partyColor(m)}"></span>`}
+    </a>`).join("") : '<p class="empty" style="padding:16px">No MPs.</p>';
+  back.classList.add("open");
+  hydratePhotos(list.slice(0,120));
+}
+function closeModal(){ back.classList.remove("open"); }
+document.getElementById("modalClose").onclick=closeModal;
+back.onclick=e=>{ if(e.target===back) closeModal(); };
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModal(); });
+
+/* ---------- KPIs (all 543) ---------- */
+const avgAssets=withAssets.reduce((s,m)=>s+m.assets_total_inr,0)/withAssets.length;
+const kpis=[
+  {lab:"Total MPs",val:N,sub:"18th Lok Sabha",col:"var(--navy)",list:()=>MPS,right:m=>m.party},
+  {lab:"Avg. declared assets",val:fmtCrore(avgAssets),sub:withAssets.length+" MPs with data",col:"var(--saffron)",list:()=>[...withAssets].sort((a,b)=>b.assets_total_inr-a.assets_total_inr),right:m=>fmtCrore(m.assets_total_inr)},
+  {lab:"Avg. cases per MP",val:(totalCases/withCasesField.length).toFixed(1),sub:totalCases+" cases declared",col:"#c2410c",list:()=>[...withCases].sort((a,b)=>b.criminal_cases-a.criminal_cases),right:m=>m.criminal_cases+" cases"},
+  {lab:"MPs with pending cases",val:withCases.length,sub:Math.round(withCases.length/withCasesField.length*100)+"% of those with data",col:"#b91c1c",list:()=>[...withCases].sort((a,b)=>b.criminal_cases-a.criminal_cases),right:m=>m.criminal_cases+" cases"},
+];
+document.getElementById("kpis").innerHTML=kpis.map((k,i)=>`
+  <div class="card kpi clickable" data-i="${i}">
+    <div class="accent" style="background:${k.col}"></div>
+    <div class="lab">${k.lab}</div><div class="val">${k.val}</div><div class="sub">${k.sub}</div>
+  </div>`).join("");
+document.querySelectorAll("#kpis .kpi").forEach(el=>{ const k=kpis[+el.dataset.i]; el.onclick=()=>openModal(k.lab, k.list(), k.right); });
+
+/* ---------- charts ---------- */
+Chart.defaults.font.family="Segoe UI, system-ui, sans-serif"; Chart.defaults.color="#5b6472";
+const byParty={}; MPS.forEach(m=>{(byParty[m.party]||=[]).push(m);});
+const parties=Object.keys(byParty).sort((a,b)=>byParty[b].length-byParty[a].length);
+const topParties=parties.slice(0,12);
+
+new Chart(document.getElementById("partyChart"),{type:"doughnut",
+ data:{labels:topParties,datasets:[{data:topParties.map(p=>byParty[p].length),backgroundColor:topParties.map(p=>PARTY_COLORS[p]||"#64748b"),borderWidth:2,borderColor:"#fff"}]},
+ options:{plugins:{legend:{position:"right",labels:{boxWidth:11,padding:6,font:{size:10}}}},cutout:"55%",maintainAspectRatio:false,
+  onClick:(e,els)=>{ if(els.length){ const p=topParties[els[0].index]; openModal("Party: "+p, byParty[p], m=>fmtCrore(m.assets_total_inr)); } }}});
+
+const assetParties=parties.filter(p=>byParty[p].some(m=>m.assets_total_inr!=null)).slice(0,14);
+new Chart(document.getElementById("assetChart"),{type:"bar",
+ data:{labels:assetParties,datasets:[{data:assetParties.map(p=>{const a=byParty[p].filter(m=>m.assets_total_inr!=null);return a.length?(a.reduce((s,m)=>s+m.assets_total_inr,0)/a.length)/1e7:0;}),backgroundColor:assetParties.map(p=>PARTY_COLORS[p]||"#64748b"),borderRadius:5}]},
+ options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`₹${c.parsed.x.toFixed(1)} Cr avg`}}},scales:{x:{beginAtZero:true,ticks:{callback:v=>"₹"+v}}},maintainAspectRatio:false,
+  onClick:(e,els)=>{ if(els.length){ const p=assetParties[els[0].index]; openModal("Party: "+p, [...byParty[p]].sort((a,b)=>(b.assets_total_inr||0)-(a.assets_total_inr||0)), m=>fmtCrore(m.assets_total_inr)); } }}});
+
+/* case types */
+const catCount={}; CASE_CATEGORIES.forEach(c=>catCount[c.key]=0);
+MPS.forEach(m=>caseCategories(m).forEach(k=>catCount[k]++));
+const catKeys=Object.keys(catCount).filter(k=>catCount[k]>0).sort((a,b)=>catCount[b]-catCount[a]);
+new Chart(document.getElementById("caseTypeChart"),{type:"bar",
+ data:{labels:catKeys,datasets:[{data:catKeys.map(k=>catCount[k]),backgroundColor:"#c2410c",borderRadius:5}]},
+ options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.x+" MP(s)"}}},scales:{x:{beginAtZero:true,ticks:{precision:0}}},maintainAspectRatio:false,
+  onClick:(e,els)=>{ if(els.length){ const k=catKeys[els[0].index]; openModal("Case type: "+k, MPS.filter(m=>caseCategories(m).includes(k)), m=>m.criminal_cases+" cases"); } }}});
+
+/* education level */
+function eduLevel(mp){ const e=(mp.education||"").toLowerCase(); if(!e) return "Not available";
+ if(e.includes("doctorate")||e.includes("phd")) return "Doctorate";
+ if(e.includes("post graduate")||/\bma\b|m\.sc|mba|m\.st|mpa|master|mphil|m\.com|m\.phil/.test(e)) return "Post-graduate";
+ if(e.includes("graduate")||e.includes("barrister")||e.includes("llb")||e.includes("chartered")||e.includes("mbbs")||/b\.e|bba|\bba\b|b\.com|b\.sc|diploma/.test(e)) return "Graduate";
+ if(e.includes("12th")||e.includes("intermediate")) return "Class 12";
+ if(e.includes("10th")||e.includes("matric")) return "Class 10";
+ if(e.includes("8th")||e.includes("5th")||e.includes("literate")) return "School / Literate";
+ return "Other"; }
+const eduCounts={}; MPS.forEach(m=>{const c=eduLevel(m);eduCounts[c]=(eduCounts[c]||0)+1;});
+const eduOrder=["Doctorate","Post-graduate","Graduate","Class 12","Class 10","School / Literate","Other","Not available"].filter(k=>eduCounts[k]);
+new Chart(document.getElementById("eduChart"),{type:"bar",
+ data:{labels:eduOrder,datasets:[{data:eduOrder.map(k=>eduCounts[k]),backgroundColor:"#16335c",borderRadius:5}]},
+ options:{indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}}},maintainAspectRatio:false,
+  onClick:(e,els)=>{ if(els.length){ const k=eduOrder[els[0].index]; openModal("Education: "+k, MPS.filter(m=>eduLevel(m)===k)); } }}});
+
+/* leaderboards */
+function rankList(el,items,valueFn){
+  const box=document.getElementById(el);
+  box.innerHTML=items.map((m,i)=>`
+   <li class="rowlink" data-id="${m.id}"><span class="rk">${i+1}</span>${avatarHTML(m,34)}
+     <div><div class="nm">${m.name}</div><div class="sm">${m.party} · ${m.constituency}</div></div>
+     <span class="mt">${valueFn(m)}</span></li>`).join("");
+  box.querySelectorAll(".rowlink").forEach(li=>li.onclick=()=>location.href="mps.html?id="+encodeURIComponent(li.dataset.id));
+  hydratePhotos(items);
+}
+rankList("richList",[...withAssets].sort((a,b)=>b.assets_total_inr-a.assets_total_inr).slice(0,8),m=>fmtCrore(m.assets_total_inr));
+rankList("caseList",[...withCases].sort((a,b)=>b.criminal_cases-a.criminal_cases).slice(0,8),m=>m.criminal_cases+" cases");
+rankList("liabList",MPS.filter(m=>m.liabilities_inr!=null).sort((a,b)=>b.liabilities_inr-a.liabilities_inr).slice(0,8),m=>fmtCrore(m.liabilities_inr));
+
+/* occupations beyond politics */
+const occCount={};
+MPS.forEach(m=>occTags(m).forEach(t=>{occCount[t]=(occCount[t]||0)+1;}));
+const occKeys=Object.keys(occCount).sort((a,b)=>occCount[b]-occCount[a]);
+new Chart(document.getElementById("occChart"),{type:"bar",
+ data:{labels:occKeys.map(occLabel),datasets:[{data:occKeys.map(k=>occCount[k]),backgroundColor:"#0e7490",borderRadius:5}]},
+ options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.x+" MPs"}}},scales:{x:{beginAtZero:true,ticks:{precision:0}}},maintainAspectRatio:false,
+  onClick:(e,els)=>{ if(els.length){ const k=occKeys[els[0].index]; openModal("Occupation: "+occLabel(k), MPS.filter(m=>occTags(m).includes(k)), m=>m.profession||""); } }}});
+
+/* ---------- Deep-profile subset ---------- */
+const abroad=profiled.filter(studiedAbroad);
+const dynasty=profiled.filter(isDynasty);
+const spouseN=profiled.filter(hasSpouse);
+const childN=profiled.filter(hasChildren);
+const dk=[
+  {lab:"Foreign-educated",val:abroad.length,sub:"of "+profiled.length+" profiled",col:"#0891b2",list:()=>abroad,right:m=>(m.education.match(FOREIGN_EDU)||[""])[0]},
+  {lab:"Political dynasty",val:dynasty.length,sub:"have a political relative",col:"#7c3aed",list:()=>dynasty},
+  {lab:"Spouse on record",val:spouseN.length,sub:"of "+profiled.length,col:"#0e7490",list:()=>spouseN},
+  {lab:"Children on record",val:childN.length,sub:"of "+profiled.length,col:"#15803d",list:()=>childN},
+];
+document.getElementById("deepKpis").innerHTML=dk.map((k,i)=>`
+  <div class="card kpi clickable" data-i="${i}"><div class="accent" style="background:${k.col}"></div>
+   <div class="lab">${k.lab}</div><div class="val">${k.val}</div><div class="sub">${k.sub}</div></div>`).join("");
+document.querySelectorAll("#deepKpis .kpi").forEach(el=>{const k=dk[+el.dataset.i];el.onclick=()=>openModal(k.lab,k.list(),k.right);});
+
+new Chart(document.getElementById("eduOriginChart"),{type:"doughnut",
+ data:{labels:["Studied abroad","India only"],datasets:[{data:[abroad.length,profiled.length-abroad.length],backgroundColor:["#0891b2","#16335c"],borderWidth:2,borderColor:"#fff"}]},
+ options:{plugins:{legend:{position:"bottom",labels:{boxWidth:12,padding:12}}},cutout:"55%",maintainAspectRatio:false,
+  onClick:(e,els)=>{ if(els.length){ const ab=els[0].index===0; openModal(ab?"Studied abroad":"India only", profiled.filter(m=>studiedAbroad(m)===ab), m=>ab?(m.education.match(FOREIGN_EDU)||[""])[0]:""); } }}});
+
+/* children/grandchildren education */
+const cer=childEduRecords();
+const cAbroad=cer.filter(r=>r.place==="Abroad"), cIndia=cer.filter(r=>r.place==="India");
+document.getElementById("childEduStats").innerHTML=`
+  <div class="mini"><div class="l">Reported (total)</div><div class="v">${cer.length}</div></div>
+  <div class="mini"><div class="l">Studied abroad</div><div class="v" style="color:#0891b2">${cAbroad.length}</div></div>
+  <div class="mini"><div class="l">Studied in India</div><div class="v" style="color:#15803d">${cIndia.length}</div></div>`;
+document.getElementById("childEduList").innerHTML = cer.length? cer.map(r=>`
+  <div class="rel"><span class="r">${r.place}</span><div class="d"><b><a class="src-link" href="mps.html?id=${encodeURIComponent(r.mp.id)}">${r.mp.name}</a> — ${r.relation}${r.name?" ("+r.name+")":""}</b>${r.detail}</div></div>`).join("")
+  : '<span class="empty">No child/grandchild education is publicly reported for MPs in this dataset.</span>';
+</script>
+</body>
+</html>

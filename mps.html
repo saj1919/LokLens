@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Find an MP — LokLens</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site-head">
+  <div class="wrap">
+    <div class="brand">
+      <div class="emblem">🏛️</div>
+      <div><h1>LokLens</h1><p>18th Lok Sabha (2024) — MP transparency dashboard</p></div>
+    </div>
+    <nav class="tabs">
+      <a href="index.html">Stats & Infographics</a>
+      <a href="mps.html" class="active">Find an MP</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="controls">
+    <div class="field"><label for="search">Search</label><input type="text" id="search" placeholder="Name, party, state or constituency…" autocomplete="off"></div>
+    <div class="field" style="max-width:200px"><label for="stateF">State / UT</label><select id="stateF"></select></div>
+    <div class="field" style="max-width:170px"><label for="partyF">Party</label><select id="partyF"></select></div>
+    <div class="field" style="max-width:170px"><label for="occF">Occupation</label><select id="occF"></select></div>
+  </div>
+  <p class="section-sub" id="countLine"></p>
+  <div class="layout">
+    <aside class="card mp-list" id="mpList"></aside>
+    <section class="card profile" id="profile"></section>
+  </div>
+</main>
+
+<footer class="site-foot"><div class="wrap">
+  <span>LokLens · Built for transparency, not endorsement.</span>
+  <span>Sources: MyNeta/ADR · Election Commission of India · Wikipedia · press reports</span>
+</div></footer>
+
+<script src="data_full.js"></script>
+<script src="photos.js"></script>
+<script src="common.js"></script>
+<script>
+const sorted=[...MPS].sort((a,b)=>a.name.localeCompare(b.name));
+const params=new URLSearchParams(location.search);
+let current=params.get("id")||sorted[0].id;
+if(!MPS.find(m=>m.id===current)) current=sorted[0].id;
+let fText=params.get("q")||"", fState="", fParty="", fOcc="";
+
+const stateF=document.getElementById("stateF"), partyF=document.getElementById("partyF"), occF=document.getElementById("occF"), searchB=document.getElementById("search");
+stateF.innerHTML='<option value="">All states</option>'+[...new Set(MPS.map(m=>m.state))].sort().map(s=>`<option>${s}</option>`).join("");
+partyF.innerHTML='<option value="">All parties</option>'+[...new Set(MPS.map(m=>m.party))].sort().map(p=>`<option>${p}</option>`).join("");
+const allOcc=[...new Set(MPS.flatMap(m=>occTags(m)))].sort((a,b)=>occLabel(a).localeCompare(occLabel(b)));
+occF.innerHTML='<option value="">Any occupation</option>'+allOcc.map(o=>`<option value="${o}">${occLabel(o)}</option>`).join("");
+searchB.value=fText;
+
+function matches(m){
+  if(fState&&m.state!==fState) return false;
+  if(fParty&&m.party!==fParty) return false;
+  if(fOcc&&!occTags(m).includes(fOcc)) return false;
+  if(fText){ const q=fText.toLowerCase(); if(![m.name,m.party,m.party_full,m.state,m.constituency,m.profession].some(x=>(x||"").toLowerCase().includes(q))) return false; }
+  return true;
+}
+function renderList(){
+  const list=sorted.filter(matches);
+  document.getElementById("countLine").textContent=`${list.length} of ${MPS.length} MPs`;
+  document.getElementById("mpList").innerHTML=list.length? list.map(m=>`
+    <div class="mp-item ${m.id===current?"active":""}" data-id="${m.id}">
+      ${avatarHTML(m,42)}
+      <div><div class="nm">${m.name}</div><div class="cn">${m.party} · ${m.constituency}</div></div>
+      <span class="dot" style="background:${partyColor(m)}"></span>
+    </div>`).join("") : `<div class="empty" style="padding:16px">No MPs match.</div>`;
+  document.querySelectorAll(".mp-item").forEach(el=>el.onclick=()=>{current=el.dataset.id;renderList();renderProfile();});
+  hydratePhotos(list.slice(0,80));
+}
+function srcLink(u,l){ return u?` <a class="src-link" href="${u}" target="_blank" rel="noopener">${l||"source ↗"}</a>`:""; }
+function itemText(it){ return typeof it==="string"?it:(it.text||it.event||it.desc||""); }
+function block(title,html){ return `<div class="block"><h4>${title}</h4>${html}</div>`; }
+
+function renderProfile(){
+  const m=MPS.find(x=>x.id===current); const el=document.getElementById("profile");
+  const caseCls=(m.criminal_cases||0)>0?"warn":"ok";
+  const caseVal=m.criminal_cases==null?"N/A":(m.criminal_cases===0?"None":m.criminal_cases);
+  let html=`
+   <div class="p-head">${avatarHTML(m,104)}
+     <div class="who"><h2>${m.name}</h2>
+       <p class="role">${m.positions||m.profession||m.one_liner||"Member of Parliament, Lok Sabha"}</p>
+       <div class="meta">
+         <span class="pill" style="background:${partyColor(m)}">${m.party_full||m.party}</span>
+         <span class="tag">${m.constituency}, ${m.state}</span>
+         ${m.age?`<span class="tag">Age ${m.age}</span>`:""}${m.gender?`<span class="tag">${m.gender}</span>`:""}
+         ${occTags(m).map(t=>`<span class="tag" style="background:#e0f2fe;color:#0c4a6e">${occLabel(t)}</span>`).join("")}
+       </div>
+     </div>
+   </div>
+   <div class="p-body">
+     <div class="stat-row">
+       <div class="mini"><div class="l">Declared assets</div><div class="v">${fmtCrore(m.assets_total_inr)}</div></div>
+       <div class="mini"><div class="l">Liabilities</div><div class="v">${fmtCrore(m.liabilities_inr)}</div></div>
+       <div class="mini"><div class="l">Pending cases</div><div class="v ${caseCls}">${caseVal}</div></div>
+       <div class="mini"><div class="l">Education</div><div class="v" style="font-size:.86rem">${(m.education||"N/A").split("—")[0].split("(")[0].trim()||"N/A"}</div></div>
+     </div>`;
+
+  if(m.ai_bio) html+=block("📋 Overview",`<div class="bio">${m.ai_bio}</div>`);
+  html+=block("🎓 Profile",`<dl class="kv">
+     <dt>Education</dt><dd>${m.education||"N/A"}</dd>
+     <dt>Profession</dt><dd>${m.profession||"N/A"}</dd>
+     ${m.positions?`<dt>Positions</dt><dd>${m.positions}</dd>`:""}</dl>`);
+
+  if(m.election){ const e=m.election; const line=[
+     e.votes!=null?fmtNum(e.votes)+" votes":null, e.vote_share_pct!=null?e.vote_share_pct+"% vote share":null,
+     e.margin!=null?"won by "+fmtNum(e.margin):null, e.runner_up?"over "+e.runner_up+(e.runner_up_party?" ("+e.runner_up_party+")":""):null
+    ].filter(Boolean).join(" · ");
+    html+=block("🗳️ 2024 election result", `<p>${line||'<span class="empty">Not available.</span>'}</p>`); }
+
+  html+=block("💰 Assets & liabilities",`<dl class="kv">
+     <dt>Total assets</dt><dd>${fmtCrore(m.assets_total_inr)}</dd>
+     <dt>Liabilities</dt><dd>${fmtCrore(m.liabilities_inr)}</dd>
+     ${m.businesses&&m.businesses.length?`<dt>Business interests</dt><dd>${m.businesses.map(b=>itemText(b)+srcLink(b.source)).join("<br>")}</dd>`:""}
+   </dl>`);
+
+  html+=block("⚖️ Legal record", `<p>${m.criminal_summary||(m.criminal_cases!=null?(m.criminal_cases===0?"No pending criminal cases declared in the 2024 affidavit.":m.criminal_cases+" pending case(s) declared in the 2024 affidavit."):'<span class="empty">No information.</span>')}</p>`+
+     ((m.allegations&&m.allegations.length)?m.allegations.map(a=>`<div class="alleg"><div class="st">${a.status||"Reported"}</div><div class="tx">${a.text}${srcLink(a.source)}</div></div>`).join(""):""));
+
+  if(m.family&&m.family.length) html+=block("👪 Family & relations", m.family.map(f=>`<div class="rel"><span class="r">${f.relation}</span><div class="d"><b>${f.name||""}</b>${f.detail||""}${srcLink(f.source)}</div></div>`).join(""));
+  if(m.notable_work&&m.notable_work.length) html+=block("⭐ Notable work","<ul style='margin:0;padding-left:18px'>"+m.notable_work.map(n=>`<li>${itemText(n)}${srcLink(n.source)}</li>`).join("")+"</ul>");
+  if(m.news_timeline&&m.news_timeline.length) html+=block("📰 Timeline","<ul class='timeline'>"+[...m.news_timeline].sort((a,b)=>(a.date<b.date?1:-1)).map(t=>`<li><div class="dt">${t.date||""}</div><div class="ev">${t.event}${srcLink(t.source)}</div></li>`).join("")+"</ul>");
+  if(m.sources&&m.sources.length) html+=block("🔗 Sources",`<p style="font-size:.82rem">${m.sources.map(s=>`<a class="src-link" href="${s}" target="_blank" rel="noopener">${s.replace(/^https?:\/\//,'').split('/')[0]} ↗</a>`).join(" · ")}</p>`);
+
+  if(!m.rich) html+=`<div class="disclaimer">This is a verified affidavit summary. A full profile (biography, family, legal detail, timeline) is part of the ongoing deep-profiling pass and not yet available for this MP.</div>`;
+  html+=`<div class="disclaimer">${DATA_META.disclaimer}</div></div>`;
+  el.innerHTML=html;
+  hydratePhotos([m]);
+}
+stateF.onchange=()=>{fState=stateF.value;renderList();};
+partyF.onchange=()=>{fParty=partyF.value;renderList();};
+occF.onchange=()=>{fOcc=occF.value;renderList();};
+searchB.oninput=e=>{fText=e.target.value;renderList();};
+renderList(); renderProfile();
+</script>
+</body>
+</html>
