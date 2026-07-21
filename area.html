@@ -52,6 +52,7 @@
 <script src="data_full.js"></script>
 <script src="governance.js"></script>
 <script src="ministers.js"></script>
+<script src="mla.js"></script>
 <script src="photos.js"></script>
 <script src="common.js"></script>
 <script>
@@ -68,6 +69,7 @@ function matchStateName(name){
 }
 function govOf(state){ const k=stateKey(state); return GOVERNANCE.find(g=>stateKey(g.state)===k)||GOVERNANCE.find(g=>stateKey(g.state).includes(k)||k.includes(stateKey(g.state))); }
 function minOf(state){ const k=stateKey(state); const key=Object.keys(MINISTERS).find(s=>stateKey(s)===k); return key?MINISTERS[key]:[]; }
+function mlaOf(state){ const k=stateKey(state); const key=Object.keys(MLAS).find(s=>stateKey(s)===k); return key?MLAS[key]:[]; }
 
 function personCard(p, role, href){
   const obj={id:p.id||p.wiki_title||p.name, name:p.name, wiki_title:p.wiki_title||p.name, party:p.party};
@@ -117,7 +119,10 @@ function renderIndia(){
 function renderState(){
   if(!cur.state){ results.innerHTML=`<div class="area-note">Enter a PIN code or pick a state above to see state-level representatives.</div>`; return; }
   H.length=0;
-  const st=cur.state, g=govOf(st), mins=minOf(st);
+  const RECENT_POLL={"West Bengal":"West Bengal held its Assembly election in April 2026; a new government took office in May 2026. The Chief Minister and MLAs below reflect that result — the full new Council of Ministers is still being compiled."};
+  const st=cur.state, g=govOf(st);
+  let mins=minOf(st);
+  if(RECENT_POLL[st]) mins=[]; // suppress stale cabinet after a fresh election
   const lsMPs=MPS.filter(m=>m.house==="Lok Sabha"&&m.state===st).sort((a,b)=>a.constituency.localeCompare(b.constituency));
   const rsMPs=MPS.filter(m=>m.house==="Rajya Sabha"&&m.state===st);
 
@@ -128,16 +133,23 @@ function renderState(){
   if(g&&g.governor) heads.push(personCard(need(g.governor),(g.governor.title||"Governor"),wiki(g.governor.wiki_title||g.governor.name)));
 
   let h=tier("🏛️",st,"state government", grid(heads));
+  if(RECENT_POLL[st]) h+=`<div class="area-note">⚠ ${RECENT_POLL[st]}</div>`;
 
   // YOUR MP picker
   h+=tier("1","Your Lok Sabha MP","pick your constituency",
     `<select id="acPick" style="max-width:340px;margin-bottom:12px"><option value="">— select your Lok Sabha constituency —</option>${lsMPs.map(m=>`<option value="${m.id}">${m.constituency}</option>`).join("")}</select>
      <div id="mpOut"></div>`);
 
-  // YOUR MLA (no dataset yet)
-  h+=tier("2","Your MLA (State Assembly)","",
-    office("Member of Legislative Assembly","Your elected state legislator for your assembly constituency. A full MLA directory is being compiled; for now, look yours up officially.",
-      [{t:"Find your MLA (ECI)",u:"https://voters.eci.gov.in/"},{t:"MyNeta — "+st,u:"https://myneta.info/"}]));
+  // YOUR MLA (real dataset)
+  const mlas=mlaOf(st);
+  if(mlas.length){
+    h+=tier("2","Your MLA (State Assembly)","pick your constituency ("+mlas.length+")",
+      `<select id="mlaPick" style="max-width:360px;margin-bottom:12px"><option value="">— select your assembly constituency —</option>${mlas.map(m=>`<option value="${m.id}">${m.ac}</option>`).join("")}</select><div id="mlaOut"></div>`);
+  } else {
+    h+=tier("2","Your MLA (State Assembly)","",
+      office("Member of Legislative Assembly","Assembly directory not compiled for this state/UT yet.",
+        [{t:"Find your MLA (ECI)",u:"https://voters.eci.gov.in/"}]));
+  }
 
   // State ministers
   if(mins.length) h+=tier("3","State Council of Ministers","cabinet ("+mins.length+")",
@@ -152,6 +164,12 @@ function renderState(){
   if(sel) sel.onchange=e=>{
     const m=MPS.find(x=>x.id===e.target.value);
     document.getElementById("mpOut").innerHTML = m? grid([personCard(m, m.constituency+" · "+(m.party||""), "mps.html?id="+encodeURIComponent(m.id))]) : "";
+    if(m) hydratePhotos([m]);
+  };
+  const msel=document.getElementById("mlaPick");
+  if(msel) msel.onchange=e=>{
+    const m=mlaOf(st).find(x=>x.id===e.target.value);
+    document.getElementById("mlaOut").innerHTML = m? grid([personCard(m, m.ac+" · "+(m.party||""), wiki(m.wiki_title))]) : "";
     if(m) hydratePhotos([m]);
   };
 }
