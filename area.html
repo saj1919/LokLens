@@ -53,6 +53,7 @@
 <script src="governance.js"></script>
 <script src="ministers.js"></script>
 <script src="mla.js"></script>
+<script src="acmap.js"></script>
 <script src="photos.js"></script>
 <script src="common.js"></script>
 <script>
@@ -70,6 +71,22 @@ function matchStateName(name){
 function govOf(state){ const k=stateKey(state); return GOVERNANCE.find(g=>stateKey(g.state)===k)||GOVERNANCE.find(g=>stateKey(g.state).includes(k)||k.includes(stateKey(g.state))); }
 function minOf(state){ const k=stateKey(state); const key=Object.keys(MINISTERS).find(s=>stateKey(s)===k); return key?MINISTERS[key]:[]; }
 function mlaOf(state){ const k=stateKey(state); const key=Object.keys(MLAS).find(s=>stateKey(s)===k); return key?MLAS[key]:[]; }
+function acmapOf(state){ const k=stateKey(state); const key=Object.keys(ACMAP).find(s=>stateKey(s)===k); return key?ACMAP[key]:[]; }
+const ncon=s=>(s||"").toLowerCase().replace(/\(s[ct]\)/g,"").replace(/[^a-z]/g,""); // constituency-name normaliser (strips no., parens)
+function autoResolve(pin){
+  cur.exactPC=cur.exactAC=null; cur.autoPCs=null; cur.autoACs=null;
+  const cp=(typeof CURATED_PINS!=="undefined")?CURATED_PINS[pin]:null;
+  if(cp){ cur.state=matchStateName(cp.state)||cur.state; cur.exactPC=cp.pc; cur.exactAC=cp.ac; cur.autoPCs=[cp.pc]; cur.autoACs=[cp.ac]; return; }
+  if(!cur.district) return;
+  const dk=ncon(cur.district);
+  const rows=acmapOf(cur.state).filter(r=>{ const a=ncon(r.district); return a&&(a===dk||a.includes(dk)||dk.includes(a)); });
+  if(rows.length){
+    cur.autoPCs=[...new Set(rows.map(r=>r.pc).filter(Boolean))];
+    cur.autoACs=[...new Set(rows.map(r=>r.ac).filter(Boolean))];
+    if(cur.autoPCs.length===1) cur.exactPC=cur.autoPCs[0];
+    if(cur.autoACs.length===1) cur.exactAC=cur.autoACs[0];
+  }
+}
 
 function personCard(p, role, href){
   const obj={id:p.id||p.wiki_title||p.name, name:p.name, wiki_title:p.wiki_title||p.name, party:p.party};
@@ -135,16 +152,23 @@ function renderState(){
   let h=tier("🏛️",st,"state government", grid(heads));
   if(RECENT_POLL[st]) h+=`<div class="area-note">⚠ ${RECENT_POLL[st]}</div>`;
 
-  // YOUR MP picker
-  h+=tier("1","Your Lok Sabha MP","pick your constituency",
-    `<select id="acPick" style="max-width:340px;margin-bottom:12px"><option value="">— select your Lok Sabha constituency —</option>${lsMPs.map(m=>`<option value="${m.id}">${m.constituency}</option>`).join("")}</select>
-     <div id="mpOut"></div>`);
+  // YOUR MP — auto from PIN, else shortlist, else picker
+  const exactMP = cur.exactPC ? lsMPs.find(m=>ncon(m.constituency)===ncon(cur.exactPC)) : null;
+  let mpTop="";
+  if(exactMP){ need(exactMP); mpTop=`<div class="area-note">✓ Your Lok Sabha seat: <b>${exactMP.constituency}</b></div>`+grid([personCard(exactMP,exactMP.constituency+" · "+(exactMP.party||""),"mps.html?id="+encodeURIComponent(exactMP.id))]); }
+  else if(cur.autoPCs&&cur.autoPCs.length){ const c=lsMPs.filter(m=>cur.autoPCs.some(p=>ncon(p)===ncon(m.constituency))); if(c.length){ c.forEach(need); mpTop=`<div class="area-note">${cur.district||st} spans ${c.length} Lok Sabha seat(s) — yours is one of these:</div>`+grid(c.map(m=>personCard(m,m.constituency+" · "+(m.party||""),"mps.html?id="+encodeURIComponent(m.id)))); } }
+  const mpPicker=`<select id="acPick" style="max-width:360px;margin:10px 0 4px"><option value="">— or pick your Lok Sabha constituency —</option>${lsMPs.map(m=>`<option value="${m.id}">${m.constituency}</option>`).join("")}</select><div id="mpOut"></div>`;
+  h+=tier("1","Your Lok Sabha MP", exactMP?"auto-detected from PIN":(cur.district?"narrowed to your district":"pick your constituency"), mpTop+mpPicker);
 
-  // YOUR MLA (real dataset)
+  // YOUR MLA — auto from PIN, else shortlist, else picker
   const mlas=mlaOf(st);
   if(mlas.length){
-    h+=tier("2","Your MLA (State Assembly)","pick your constituency ("+mlas.length+")",
-      `<select id="mlaPick" style="max-width:360px;margin-bottom:12px"><option value="">— select your assembly constituency —</option>${mlas.map(m=>`<option value="${m.id}">${m.ac}</option>`).join("")}</select><div id="mlaOut"></div>`);
+    const exactMLA = cur.exactAC ? mlas.find(m=>ncon(m.ac)===ncon(cur.exactAC)) : null;
+    let mlaTop="";
+    if(exactMLA){ need(exactMLA); mlaTop=`<div class="area-note">✓ Your Assembly seat: <b>${exactMLA.ac}</b></div>`+grid([personCard(exactMLA,exactMLA.ac+" · "+(exactMLA.party||""),wiki(exactMLA.wiki_title))]); }
+    else if(cur.autoACs&&cur.autoACs.length){ const c=mlas.filter(m=>cur.autoACs.some(a=>ncon(a)===ncon(m.ac))); if(c.length){ c.forEach(need); mlaTop=`<div class="area-note">${cur.district||st} has ${c.length} assembly seat(s) — yours is one of these:</div>`+grid(c.map(m=>personCard(m,m.ac+" · "+(m.party||""),wiki(m.wiki_title)))); } }
+    const mlaPicker=`<select id="mlaPick" style="max-width:360px;margin:10px 0 4px"><option value="">— or pick your assembly constituency —</option>${mlas.map(m=>`<option value="${m.id}">${m.ac}</option>`).join("")}</select><div id="mlaOut"></div>`;
+    h+=tier("2","Your MLA (State Assembly)", exactMLA?"auto-detected from PIN":(cur.district?"narrowed to your district":"pick your constituency ("+mlas.length+")"), mlaTop+mlaPicker);
   } else {
     h+=tier("2","Your MLA (State Assembly)","",
       office("Member of Legislative Assembly","Assembly directory not compiled for this state/UT yet.",
@@ -237,13 +261,14 @@ async function lookupPin(pin){
     const names=[...new Set(pos.map(p=>p.Name))].slice(0,3).join(", ")+(pos.length>3?"…":"");
     msg.textContent="";
     setLoc(pos[0].State, pos[0].District, names, pin);
+    autoResolve(pin);
     cur.level="state"; render();
   }catch(e){ msg.textContent="Couldn't reach the postal service — use the state picker."; }
 }
 
 document.getElementById("go").onclick=()=>lookupPin(document.getElementById("pin").value.trim());
 document.getElementById("pin").addEventListener("keydown",e=>{ if(e.key==="Enter") lookupPin(e.target.value.trim()); });
-document.getElementById("stateSel").onchange=e=>{ if(e.target.value){ setLoc(e.target.value,"","",""); cur.level="state"; render(); } };
+document.getElementById("stateSel").onchange=e=>{ if(e.target.value){ setLoc(e.target.value,"","",""); cur.exactPC=cur.exactAC=null; cur.autoPCs=cur.autoACs=null; cur.level="state"; render(); } };
 document.querySelectorAll("#levelNav button").forEach(b=>b.onclick=()=>{ cur.level=b.dataset.lvl; render(); });
 
 const qp=new URLSearchParams(location.search).get("pin"); if(qp){ document.getElementById("pin").value=qp; lookupPin(qp); } else render();
