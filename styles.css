@@ -125,6 +125,38 @@ select:focus,input:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 
 .empty{color:var(--muted);font-size:.86rem;font-style:italic}
 .disclaimer{font-size:.78rem;color:var(--muted);background:#fffdf5;border:1px solid #f0e6c8;border-radius:10px;padding:12px 14px;margin-top:14px}
 
+/* My Area — focus + sidebar layout */
+.focus-h{font-size:.8rem;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700;margin:22px 0 12px;display:flex;align-items:center;gap:8px}
+.focus-h:first-child{margin-top:4px}
+.focus-h .hint2{text-transform:none;letter-spacing:0;font-weight:500;color:var(--muted);margin-left:auto;font-size:.75rem}
+.area-grid{display:grid;grid-template-columns:1fr 336px;gap:22px;align-items:start}
+.area-main{min-width:0}
+.rep-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:14px}
+.repcard{display:flex;gap:14px;align-items:center;padding:16px;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:var(--shadow);text-decoration:none;color:inherit;position:relative}
+.repcard:hover{box-shadow:var(--shadow-lg);border-color:#cdddf2}
+.repcard .av{width:66px;height:66px;flex:none;font-size:24px}
+.repcard .role{font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
+.repcard .nm{font-size:1.15rem;font-weight:800;line-height:1.15;margin:3px 0 5px}
+.repcard .sub{font-size:.8rem;color:var(--muted);margin-bottom:6px}
+.repcard .go{position:absolute;right:12px;top:12px;color:var(--muted);font-size:1.2rem;opacity:.45}
+.repcard.empty-pick{display:block;background:#fbfcfe;border-style:dashed;box-shadow:none}
+.area-side{display:flex;flex-direction:column;gap:14px;position:sticky;top:12px}
+.side-card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+details.side-card>summary{list-style:none;cursor:pointer;padding:13px 15px;font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:8px}
+details.side-card>summary::-webkit-details-marker{display:none}
+details.side-card>summary .cnt{color:var(--muted);font-size:.76rem;font-weight:600}
+details.side-card>summary::after{content:"▸";margin-left:auto;color:var(--muted);transition:transform .15s}
+details.side-card[open]>summary::after{transform:rotate(90deg)}
+.side-body{padding:2px 8px 10px;max-height:330px;overflow:auto}
+.srow{display:flex;gap:9px;align-items:center;padding:7px 6px;border-radius:9px;text-decoration:none;color:inherit}
+.srow:hover{background:#f2f5fa}
+.srow .av{width:32px;height:32px;flex:none;font-size:12px}
+.srow .nm{font-weight:600;font-size:.83rem;line-height:1.15}
+.srow .rl{font-size:.71rem;color:var(--muted)}
+.side-links{display:flex;flex-direction:column;gap:2px;padding:6px 8px 10px}
+.side-title{padding:13px 15px 4px;font-weight:700;font-size:.9rem}
+@media(max-width:1000px){ .area-grid{grid-template-columns:1fr} .area-side{position:static} }
+
 /* My Area page */
 .fl{display:block;font-size:.74rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
 .pin-search{display:flex;gap:10px;margin:18px 0 6px;flex-wrap:wrap;align-items:flex-end}

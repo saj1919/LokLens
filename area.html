@@ -137,69 +137,67 @@ function renderIndia(){
   results.innerHTML=h; hydratePhotos(H);
 }
 
+function repCardH(p,role,sub,href){const o={id:p.id||p.wiki_title||p.name,name:p.name,wiki_title:p.wiki_title||p.name,party:p.party};const ext=href&&href.startsWith("http");return `<a class="repcard" href="${href||'#'}" ${ext?'target="_blank" rel="noopener"':''}>${avatarHTML(o,66)}<div style="min-width:0"><div class="role">${role}</div><div class="nm">${p.name}</div>${sub?`<div class="sub">${sub}</div>`:""}${p.party?`<span class="pill" style="background:${partyColor(p)}">${p.party}</span>`:""}</div><span class="go">›</span></a>`;}
+function sRowH(p,role,href){const o={id:p.id||p.wiki_title||p.name,name:p.name,wiki_title:p.wiki_title||p.name,party:p.party};const ext=href&&href.startsWith("http");return `<a class="srow" href="${href||'#'}" ${ext?'target="_blank" rel="noopener"':''}>${avatarHTML(o,32)}<div><div class="nm">${p.name}</div><div class="rl">${role||""}</div></div></a>`;}
+function sideCardH(title,count,body,open){return `<details class="side-card" ${open?"open":""}><summary>${title}${count!=null?` <span class="cnt">${count}</span>`:""}</summary><div class="side-body">${body}</div></details>`;}
+
 function renderState(){
-  if(!cur.state){ results.innerHTML=`<div class="area-note">Enter a PIN code or pick a state above to see state-level representatives.</div>`; return; }
+  if(!cur.state){ results.innerHTML=`<div class="area-note">Enter a PIN code or pick a state above to see your representatives.</div>`; return; }
   H.length=0;
-  const RECENT_POLL={"West Bengal":"West Bengal held its Assembly election in April 2026; a new government took office in May 2026. The Chief Minister and MLAs below reflect that result — the full new Council of Ministers is still being compiled."};
+  const RECENT_POLL={"West Bengal":"West Bengal held its Assembly election in April 2026; a new government took office in May 2026. The Chief Minister and MLAs reflect that; the full new Council of Ministers is still being compiled."};
   const st=cur.state, g=govOf(st);
-  let mins=minOf(st);
-  if(RECENT_POLL[st]) mins=[]; // suppress stale cabinet after a fresh election
+  const minsSuppressed=!!RECENT_POLL[st];
+  let mins=minsSuppressed?[]:minOf(st);
   const lsMPs=MPS.filter(m=>m.house==="Lok Sabha"&&m.state===st).sort((a,b)=>a.constituency.localeCompare(b.constituency));
   const rsMPs=MPS.filter(m=>m.house==="Rajya Sabha"&&m.state===st);
-
-  // heads
-  const heads=[];
-  if(g&&g.cm) heads.push(personCard(need(g.cm),"Chief Minister"+(g.cm.since?" · since "+String(g.cm.since).slice(0,4):""),wiki(g.cm.wiki_title||g.cm.name)));
-  (g&&g.deputy_cm||[]).forEach(d=>heads.push(personCard(need(d),"Deputy Chief Minister",wiki(d.wiki_title||d.name))));
-  if(g&&g.governor) heads.push(personCard(need(g.governor),(g.governor.title||"Governor"),wiki(g.governor.wiki_title||g.governor.name)));
-
-  let h=tier("🏛️",st,"state government", grid(heads));
-  if(RECENT_POLL[st]) h+=`<div class="area-note">⚠ ${RECENT_POLL[st]}</div>`;
-
-  // YOUR MP — auto from PIN, else shortlist, else picker
-  const exactMP = cur.exactPC ? lsMPs.find(m=>ncon(m.constituency)===ncon(cur.exactPC)) : null;
-  let mpTop="";
-  if(exactMP){ need(exactMP); mpTop=`<div class="area-note">✓ Your Lok Sabha seat: <b>${exactMP.constituency}</b></div>`+grid([personCard(exactMP,exactMP.constituency+" · "+(exactMP.party||""),"mps.html?id="+encodeURIComponent(exactMP.id))]); }
-  else if(cur.autoPCs&&cur.autoPCs.length){ const c=lsMPs.filter(m=>cur.autoPCs.some(p=>ncon(p)===ncon(m.constituency))); if(c.length){ c.forEach(need); mpTop=`<div class="area-note">${cur.district||st} spans ${c.length} Lok Sabha seat(s) — yours is one of these:</div>`+grid(c.map(m=>personCard(m,m.constituency+" · "+(m.party||""),"mps.html?id="+encodeURIComponent(m.id)))); } }
-  const mpPicker=`<select id="acPick" style="max-width:360px;margin:10px 0 4px"><option value="">— or pick your Lok Sabha constituency —</option>${lsMPs.map(m=>`<option value="${m.id}">${m.constituency}</option>`).join("")}</select><div id="mpOut"></div>`;
-  h+=tier("1","Your Lok Sabha MP", exactMP?"auto-detected from PIN":(cur.district?"narrowed to your district":"pick your constituency"), mpTop+mpPicker);
-
-  // YOUR MLA — auto from PIN, else shortlist, else picker
   const mlas=mlaOf(st);
-  if(mlas.length){
-    const exactMLA = cur.exactAC ? mlas.find(m=>ncon(m.ac)===ncon(cur.exactAC)) : null;
-    let mlaTop="";
-    if(exactMLA){ need(exactMLA); mlaTop=`<div class="area-note">✓ Your Assembly seat: <b>${exactMLA.ac}</b></div>`+grid([personCard(exactMLA,exactMLA.ac+" · "+(exactMLA.party||""),wiki(exactMLA.wiki_title))]); }
-    else if(cur.autoACs&&cur.autoACs.length){ const c=mlas.filter(m=>cur.autoACs.some(a=>ncon(a)===ncon(m.ac))); if(c.length){ c.forEach(need); mlaTop=`<div class="area-note">${cur.district||st} has ${c.length} assembly seat(s) — yours is one of these:</div>`+grid(c.map(m=>personCard(m,m.ac+" · "+(m.party||""),wiki(m.wiki_title)))); } }
-    const mlaPicker=`<select id="mlaPick" style="max-width:360px;margin:10px 0 4px"><option value="">— or pick your assembly constituency —</option>${mlas.map(m=>`<option value="${m.id}">${m.ac}</option>`).join("")}</select><div id="mlaOut"></div>`;
-    h+=tier("2","Your MLA (State Assembly)", exactMLA?"auto-detected from PIN":(cur.district?"narrowed to your district":"pick your constituency ("+mlas.length+")"), mlaTop+mlaPicker);
-  } else {
-    h+=tier("2","Your MLA (State Assembly)","",
-      office("Member of Legislative Assembly","Assembly directory not compiled for this state/UT yet.",
-        [{t:"Find your MLA (ECI)",u:"https://voters.eci.gov.in/"}]));
-  }
 
-  // State ministers
-  if(mins.length) h+=tier("3","State Council of Ministers","cabinet ("+mins.length+")",
-    grid(mins.map(m=>personCard(need(m), m.portfolio||"Minister", wiki(m.wiki_title)))));
+  // MP slot
+  const exactMP = cur.exactPC ? lsMPs.find(m=>ncon(m.constituency)===ncon(cur.exactPC)) : null;
+  let mpSlot;
+  if(exactMP){ need(exactMP); mpSlot=repCardH(exactMP,"Your MP · Lok Sabha",exactMP.constituency,"mps.html?id="+encodeURIComponent(exactMP.id)); }
+  else { const opts=`<select id="acPick"><option value="">Select your Lok Sabha constituency…</option>${lsMPs.map(m=>`<option value="${m.id}">${m.constituency}</option>`).join("")}</select>`;
+    const hint=(cur.autoPCs&&cur.autoPCs.length>1)?`Your area (${cur.district||st}) spans ${cur.autoPCs.length} seats — pick yours:`:`Select your Lok Sabha constituency:`;
+    mpSlot=`<div class="repcard empty-pick"><div class="role">Your MP · Lok Sabha</div><div class="sub" style="margin:6px 0">${hint}</div>${opts}<div id="mpOut" style="margin-top:10px"></div></div>`; }
 
-  // Rajya Sabha
-  if(rsMPs.length) h+=tier("4","Rajya Sabha MPs from "+st,"upper house ("+rsMPs.length+")",
-    grid(rsMPs.map(m=>personCard(need(m),"Rajya Sabha"+(m.term_ends?" · to "+m.term_ends:""),"mps.html?id="+encodeURIComponent(m.id)))));
+  // MLA slot
+  const exactMLA = (mlas.length&&cur.exactAC) ? mlas.find(m=>ncon(m.ac)===ncon(cur.exactAC)) : null;
+  let mlaSlot;
+  if(exactMLA){ need(exactMLA); mlaSlot=repCardH(exactMLA,"Your MLA · State Assembly",exactMLA.ac,wiki(exactMLA.wiki_title)); }
+  else if(mlas.length){ const opts=`<select id="mlaPick"><option value="">Select your assembly constituency…</option>${mlas.map(m=>`<option value="${m.id}">${m.ac}</option>`).join("")}</select>`;
+    const hint=(cur.autoACs&&cur.autoACs.length>1)?`${cur.district||st} has ${cur.autoACs.length} assembly seats — pick yours:`:`Select your assembly constituency:`;
+    mlaSlot=`<div class="repcard empty-pick"><div class="role">Your MLA · State Assembly</div><div class="sub" style="margin:6px 0">${hint}</div>${opts}<div id="mlaOut" style="margin-top:10px"></div></div>`; }
+  else { mlaSlot=`<div class="repcard empty-pick"><div class="role">Your MLA · State Assembly</div><div class="sub" style="margin:6px 0">Assembly directory not compiled for this state/UT yet.</div><a class="src-link" href="https://voters.eci.gov.in/" target="_blank" rel="noopener">Find your MLA (ECI) ↗</a></div>`; }
 
-  results.innerHTML=h; hydratePhotos(H);
+  // state heads
+  const heads=[];
+  if(g&&g.cm) heads.push(repCardH(need(g.cm),"Chief Minister"+(g.cm.since?" · since "+String(g.cm.since).slice(0,4):""),"",wiki(g.cm.wiki_title||g.cm.name)));
+  (g&&g.deputy_cm||[]).forEach(d=>heads.push(repCardH(need(d),"Deputy Chief Minister","",wiki(d.wiki_title||d.name))));
+  if(g&&g.governor) heads.push(repCardH(need(g.governor),(g.governor.title||"Governor"),"",wiki(g.governor.wiki_title||g.governor.name)));
+
+  let main=`<h3 class="focus-h">Your elected representatives <span class="hint2">${st}</span></h3><div class="rep-grid">${mpSlot}${mlaSlot}</div>`;
+  main+=`<h3 class="focus-h">Your state government</h3><div class="rep-grid">${heads.join("")||'<div class="empty" style="padding:10px">Not available.</div>'}</div>`;
+  if(minsSuppressed) main+=`<div class="area-note">⚠ ${RECENT_POLL[st]}</div>`;
+
+  // sidebar (reference)
+  let side="";
+  if(rsMPs.length) side+=sideCardH(`Rajya Sabha — ${st}`, rsMPs.length, rsMPs.map(m=>{need(m);return sRowH(m,(m.party||"")+(m.term_ends?" · to "+m.term_ends:""),"mps.html?id="+encodeURIComponent(m.id));}).join(""), false);
+  if(mins.length) side+=sideCardH("State Council of Ministers", mins.length, mins.map(m=>{need(m);return sRowH(m,m.portfolio||"Minister",wiki(m.wiki_title));}).join(""), false);
+  else if(minsSuppressed) side+=`<div class="side-card"><div class="side-title">State Council of Ministers</div><div style="padding:0 15px 12px;font-size:.82rem;color:var(--muted)">New cabinet being compiled after the recent election.</div></div>`;
+  side+=sideCardH("Grievances & emergencies", null,
+    `<a class="srow" href="https://pgportal.gov.in/" target="_blank" rel="noopener"><div><div class="nm">CPGRAMS — file a grievance</div><div class="rl">to any government office</div></div></a>
+     <a class="srow" href="https://rtionline.gov.in/" target="_blank" rel="noopener"><div><div class="nm">RTI Online</div><div class="rl">demand information by law</div></div></a>
+     <div class="emerg" style="padding:8px 4px 2px">
+      <div><div class="n">112</div><div class="w">Emergency</div></div><div><div class="n">100</div><div class="w">Police</div></div>
+      <div><div class="n">108</div><div class="w">Ambulance</div></div><div><div class="n">1091</div><div class="w">Women</div></div>
+      <div><div class="n">1098</div><div class="w">Child</div></div><div><div class="n">1930</div><div class="w">Cyber</div></div></div>`, false);
+
+  results.innerHTML=`<div class="area-grid"><div class="area-main">${main}</div><aside class="area-side">${side}</aside></div>`;
+  hydratePhotos(H);
   const sel=document.getElementById("acPick");
-  if(sel) sel.onchange=e=>{
-    const m=MPS.find(x=>x.id===e.target.value);
-    document.getElementById("mpOut").innerHTML = m? grid([personCard(m, m.constituency+" · "+(m.party||""), "mps.html?id="+encodeURIComponent(m.id))]) : "";
-    if(m) hydratePhotos([m]);
-  };
+  if(sel) sel.onchange=e=>{ const m=MPS.find(x=>x.id===e.target.value); document.getElementById("mpOut").innerHTML=m?repCardH(m,"Your MP · Lok Sabha",m.constituency,"mps.html?id="+encodeURIComponent(m.id)):""; if(m)hydratePhotos([m]); };
   const msel=document.getElementById("mlaPick");
-  if(msel) msel.onchange=e=>{
-    const m=mlaOf(st).find(x=>x.id===e.target.value);
-    document.getElementById("mlaOut").innerHTML = m? grid([personCard(m, m.ac+" · "+(m.party||""), wiki(m.wiki_title))]) : "";
-    if(m) hydratePhotos([m]);
-  };
+  if(msel) msel.onchange=e=>{ const m=mlaOf(st).find(x=>x.id===e.target.value); document.getElementById("mlaOut").innerHTML=m?repCardH(m,"Your MLA · State Assembly",m.ac,wiki(m.wiki_title)):""; if(m)hydratePhotos([m]); };
 }
 
 function renderDistrict(){
