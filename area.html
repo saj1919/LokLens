@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Area — Know Your Representatives | LokLens</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site-head">
+  <div class="wrap">
+    <div class="brand"><div class="emblem">🏛️</div>
+      <div><h1>LokLens</h1><p>Parliament of India — Lok Sabha &amp; Rajya Sabha</p></div>
+    </div>
+    <nav class="tabs">
+      <a href="index.html">Stats &amp; Infographics</a>
+      <a href="mps.html">Find an MP</a>
+      <a href="area.html" class="active">My Area</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h2>Know your representatives &amp; officials</h2>
+    <p>Drill down through the tiers of government for your area — from your single Lok Sabha MP to your
+       state cabinet and local bodies. Enter a PIN code, or pick a state.</p>
+    <div class="pin-search">
+      <div><label class="fl">PIN code</label><input type="text" id="pin" inputmode="numeric" maxlength="6" placeholder="e.g. 110001"></div>
+      <button class="pin-btn" id="go">Find</button>
+      <div><label class="fl">or pick a state</label><select id="stateSel" style="min-width:220px"></select></div>
+    </div>
+    <p class="pin-eg" id="msg"></p>
+    <div class="loc-card" id="locCard" style="display:none"></div>
+  </section>
+
+  <div class="house-toggle" id="levelNav" style="margin-top:6px">
+    <button data-lvl="india" class="active">🇮🇳 India</button>
+    <button data-lvl="state">🏛️ State</button>
+    <button data-lvl="district">🏙️ District / City</button>
+    <button data-lvl="village">🌾 Village</button>
+  </div>
+
+  <div id="results"></div>
+</main>
+
+<footer class="site-foot"><div class="wrap">
+  <span>LokLens · Built for transparency, not endorsement.</span>
+  <span>Sources: MyNeta/ADR · ECI · Wikipedia · India Post · official government portals</span>
+</div></footer>
+
+<script src="data_full.js"></script>
+<script src="governance.js"></script>
+<script src="ministers.js"></script>
+<script src="photos.js"></script>
+<script src="common.js"></script>
+<script>
+const results=document.getElementById("results"), msg=document.getElementById("msg");
+const stateKey=s=>(s||"").toLowerCase().replace(/&/g,"and").replace(/[^a-z]/g,"");
+const cur={level:"india", state:"", district:"", pin:""};
+
+const allStates=[...new Set(MPS.map(m=>m.state))].filter(s=>s&&s!=="Nominated").sort();
+document.getElementById("stateSel").innerHTML='<option value="">— select —</option>'+allStates.map(s=>`<option>${s}</option>`).join("");
+
+function matchStateName(name){
+  const k=stateKey(name);
+  return allStates.find(s=>stateKey(s)===k) || allStates.find(s=>stateKey(s).includes(k)||k.includes(stateKey(s))) || name;
+}
+function govOf(state){ const k=stateKey(state); return GOVERNANCE.find(g=>stateKey(g.state)===k)||GOVERNANCE.find(g=>stateKey(g.state).includes(k)||k.includes(stateKey(g.state))); }
+function minOf(state){ const k=stateKey(state); const key=Object.keys(MINISTERS).find(s=>stateKey(s)===k); return key?MINISTERS[key]:[]; }
+
+function personCard(p, role, href){
+  const obj={id:p.id||p.wiki_title||p.name, name:p.name, wiki_title:p.wiki_title||p.name, party:p.party};
+  const ext=href&&href.startsWith("http");
+  return `<a class="pcard" href="${href||'#'}" ${ext?'target="_blank" rel="noopener"':''}>
+    ${avatarHTML(obj,46)}
+    <div><div class="nm">${p.name}</div><div class="rl">${role||""}</div>${p.party?`<div class="pty">${p.party}</div>`:""}</div></a>`;
+}
+function wiki(t){ return "https://en.wikipedia.org/wiki/"+encodeURIComponent((t||"").replace(/ /g,"_")); }
+function office(title, role, links){
+  return `<div class="office"><h4>${title}</h4><p class="role">${role}</p><div class="links">${(links||[]).map(l=>`<a href="${l.u}" target="_blank" rel="noopener">${l.t} ↗</a>`).join("")}</div></div>`;
+}
+function tier(num,title,sub,inner){ return `<div class="tier"><div class="tier-head"><span class="tier-num">${num}</span><h3>${title}</h3>${sub?`<span class="sub">${sub}</span>`:""}</div>${inner}</div>`; }
+const H=[];
+function grid(cards){ return `<div class="person-grid">${cards.join("")}</div>`; }
+function need(o){ H.push(o); return o; }
+
+function crossBlock(){
+  return tier("★","Reach any official & emergencies","",
+    office("Grievances (any govt office) & RTI","Escalate any issue; demand information by law.",
+      [{t:"CPGRAMS",u:"https://pgportal.gov.in/"},{t:"RTI Online",u:"https://rtionline.gov.in/"}])+
+    `<div style="margin-top:10px" class="emerg">
+      <div><div class="n">112</div><div class="w">All emergencies</div></div>
+      <div><div class="n">100</div><div class="w">Police</div></div>
+      <div><div class="n">101</div><div class="w">Fire</div></div>
+      <div><div class="n">108</div><div class="w">Ambulance</div></div>
+      <div><div class="n">1091</div><div class="w">Women</div></div>
+      <div><div class="n">1098</div><div class="w">Child</div></div>
+      <div><div class="n">1930</div><div class="w">Cyber fraud</div></div>
+      <div><div class="n">1915</div><div class="w">Consumer</div></div>
+    </div>`);
+}
+
+function renderIndia(){
+  H.length=0;
+  let h=tier("🇮🇳","India — Union Government","national",
+    grid([personCard(need({id:PRESIDENT.id,name:PRESIDENT.name,wiki_title:PRESIDENT.wiki_title}),"President of India (Head of State)",wiki(PRESIDENT.wiki_title))]));
+  h+=tier("1","Lok Sabha — 543 elected MPs","lower house",
+    `<div class="area-note">Your single MP depends on your constituency. Switch to the <b>State</b> tab and pick your constituency to see your one MP — or browse all in <a class="src-link" href="mps.html">Find an MP</a>.</div>`);
+  const uni=MINISTERS["Union"]||[];
+  if(uni.length) h+=tier("2","Union Council of Ministers","central cabinet + MoS",
+    grid(uni.map(m=>personCard(need(m), m.portfolio||"Minister", wiki(m.wiki_title)))));
+  h+=crossBlock();
+  results.innerHTML=h; hydratePhotos(H);
+}
+
+function renderState(){
+  if(!cur.state){ results.innerHTML=`<div class="area-note">Enter a PIN code or pick a state above to see state-level representatives.</div>`; return; }
+  H.length=0;
+  const st=cur.state, g=govOf(st), mins=minOf(st);
+  const lsMPs=MPS.filter(m=>m.house==="Lok Sabha"&&m.state===st).sort((a,b)=>a.constituency.localeCompare(b.constituency));
+  const rsMPs=MPS.filter(m=>m.house==="Rajya Sabha"&&m.state===st);
+
+  // heads
+  const heads=[];
+  if(g&&g.cm) heads.push(personCard(need(g.cm),"Chief Minister"+(g.cm.since?" · since "+String(g.cm.since).slice(0,4):""),wiki(g.cm.wiki_title||g.cm.name)));
+  (g&&g.deputy_cm||[]).forEach(d=>heads.push(personCard(need(d),"Deputy Chief Minister",wiki(d.wiki_title||d.name))));
+  if(g&&g.governor) heads.push(personCard(need(g.governor),(g.governor.title||"Governor"),wiki(g.governor.wiki_title||g.governor.name)));
+
+  let h=tier("🏛️",st,"state government", grid(heads));
+
+  // YOUR MP picker
+  h+=tier("1","Your Lok Sabha MP","pick your constituency",
+    `<select id="acPick" style="max-width:340px;margin-bottom:12px"><option value="">— select your Lok Sabha constituency —</option>${lsMPs.map(m=>`<option value="${m.id}">${m.constituency}</option>`).join("")}</select>
+     <div id="mpOut"></div>`);
+
+  // YOUR MLA (no dataset yet)
+  h+=tier("2","Your MLA (State Assembly)","",
+    office("Member of Legislative Assembly","Your elected state legislator for your assembly constituency. A full MLA directory is being compiled; for now, look yours up officially.",
+      [{t:"Find your MLA (ECI)",u:"https://voters.eci.gov.in/"},{t:"MyNeta — "+st,u:"https://myneta.info/"}]));
+
+  // State ministers
+  if(mins.length) h+=tier("3","State Council of Ministers","cabinet ("+mins.length+")",
+    grid(mins.map(m=>personCard(need(m), m.portfolio||"Minister", wiki(m.wiki_title)))));
+
+  // Rajya Sabha
+  if(rsMPs.length) h+=tier("4","Rajya Sabha MPs from "+st,"upper house ("+rsMPs.length+")",
+    grid(rsMPs.map(m=>personCard(need(m),"Rajya Sabha"+(m.term_ends?" · to "+m.term_ends:""),"mps.html?id="+encodeURIComponent(m.id)))));
+
+  results.innerHTML=h; hydratePhotos(H);
+  const sel=document.getElementById("acPick");
+  if(sel) sel.onchange=e=>{
+    const m=MPS.find(x=>x.id===e.target.value);
+    document.getElementById("mpOut").innerHTML = m? grid([personCard(m, m.constituency+" · "+(m.party||""), "mps.html?id="+encodeURIComponent(m.id))]) : "";
+    if(m) hydratePhotos([m]);
+  };
+}
+
+function renderDistrict(){
+  const d=cur.district||"your district", st=cur.state?(" · "+cur.state):"";
+  results.innerHTML=tier("🏙️","District / City"+ (cur.district?(" — "+cur.district):""), cur.state||"",
+    `<div class="area-note">These officials are appointed/elected locally and change often — there is no reliable national dataset, so each is shown with its role and the official place to find the current person & contact.</div>
+     <div style="display:grid;gap:10px">`+
+     office("District Collector / District Magistrate (DM)","IAS officer heading the district — revenue, land, disaster relief, coordination.",
+       [{t:"District portal (usually "+(cur.district?slugDist(cur.district):"district")+".nic.in)",u:cur.district?("https://"+slugDist(cur.district)+".nic.in"):"https://www.india.gov.in/my-government/district-e-governance"},{t:"CPGRAMS",u:"https://pgportal.gov.in/"}])+
+     office("Municipal Commissioner","IAS/state officer who runs the city corporation day-to-day (water, roads, garbage, property tax).",
+       [{t:"Your Municipal Corporation",u:"https://www.india.gov.in/topics/urban-rural-life/municipality"},{t:"Civic complaints (Swachhata)",u:"https://swachhata.mohua.gov.in/"}])+
+     office("Mayor","Elected ceremonial head of the Municipal Corporation.",
+       [{t:"City corporation site",u:"https://www.india.gov.in/topics/urban-rural-life/municipality"}])+
+     office("Ward Corporator / Councillor","Your elected local representative for your ward — first point for neighbourhood civic issues.",
+       [{t:"Find your ward (corporation site)",u:"https://www.india.gov.in/topics/urban-rural-life/municipality"}])+
+     office("Superintendent of Police (SP) / Commissioner of Police","District police head; local point is your Station House Officer (SHO).",
+       [{t:"Emergency 112",u:"tel:112"},{t:"State Police portal",u:"https://www.india.gov.in/topics/law-justice/police"}])+
+    `</div>`) + crossBlock2();
+}
+function crossBlock2(){ return ""; }
+function slugDist(d){ return (d||"").toLowerCase().replace(/[^a-z]/g,""); }
+
+function renderVillage(){
+  results.innerHTML=tier("🌾","Village / Rural Local Government", cur.district||cur.state||"",
+    `<div class="area-note">Rural governance is the 3-tier Panchayati Raj. There are ~2.5 lakh gram panchayats — no national directory of names exists, so use the official portals to find your local reps.</div>
+     <div style="display:grid;gap:10px">`+
+     office("Gram Panchayat & Sarpanch (Pradhan)","Village-level elected council and its head (Sarpanch/Pradhan) — local works, water, sanitation, certificates.",
+       [{t:"Panchayat portal",u:"https://panchayat.gov.in/"},{t:"eGramSwaraj",u:"https://egramswaraj.gov.in/"}])+
+     office("Ward Members (Panch)","Elected members of the Gram Panchayat for each ward of the village.",
+       [{t:"eGramSwaraj directory",u:"https://egramswaraj.gov.in/"}])+
+     office("Panchayat Samiti (Block) & Zilla Parishad (District)","Intermediate (block, run by the BDO) and district tiers of rural self-government.",
+       [{t:"Panchayat portal",u:"https://panchayat.gov.in/"}])+
+    `</div>`);
+}
+
+function render(){
+  document.querySelectorAll("#levelNav button").forEach(b=>b.classList.toggle("active",b.dataset.lvl===cur.level));
+  if(cur.level==="india") renderIndia();
+  else if(cur.level==="state") renderState();
+  else if(cur.level==="district") renderDistrict();
+  else if(cur.level==="village") renderVillage();
+  results.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+function setLoc(state,district,areaNames,pin){
+  cur.state=matchStateName(state); cur.district=district||""; cur.pin=pin||"";
+  const lc=document.getElementById("locCard");
+  lc.style.display="flex";
+  lc.innerHTML=`${pin?`<div><div class="l">PIN</div><div class="v">${pin}</div></div>`:""}
+    ${areaNames?`<div><div class="l">Area</div><div class="v">${areaNames}</div></div>`:""}
+    ${district?`<div><div class="l">District</div><div class="v">${district}</div></div>`:""}
+    <div><div class="l">State / UT</div><div class="v">${cur.state}</div></div>`;
+}
+
+async function lookupPin(pin){
+  if(!/^\d{6}$/.test(pin)){ msg.textContent="Please enter a valid 6-digit PIN code."; return; }
+  msg.textContent="Looking up "+pin+"…";
+  try{
+    const j=await fetch("https://api.postalpincode.in/pincode/"+pin).then(r=>r.json());
+    const rec=j&&j[0];
+    if(!rec||rec.Status!=="Success"||!rec.PostOffice||!rec.PostOffice.length){ msg.textContent="No area found for "+pin+". Use the state picker."; return; }
+    const pos=rec.PostOffice;
+    const names=[...new Set(pos.map(p=>p.Name))].slice(0,3).join(", ")+(pos.length>3?"…":"");
+    msg.textContent="";
+    setLoc(pos[0].State, pos[0].District, names, pin);
+    cur.level="state"; render();
+  }catch(e){ msg.textContent="Couldn't reach the postal service — use the state picker."; }
+}
+
+document.getElementById("go").onclick=()=>lookupPin(document.getElementById("pin").value.trim());
+document.getElementById("pin").addEventListener("keydown",e=>{ if(e.key==="Enter") lookupPin(e.target.value.trim()); });
+document.getElementById("stateSel").onchange=e=>{ if(e.target.value){ setLoc(e.target.value,"","",""); cur.level="state"; render(); } };
+document.querySelectorAll("#levelNav button").forEach(b=>b.onclick=()=>{ cur.level=b.dataset.lvl; render(); });
+
+const qp=new URLSearchParams(location.search).get("pin"); if(qp){ document.getElementById("pin").value=qp; lookupPin(qp); } else render();
+</script>
+</body>
+</html>
