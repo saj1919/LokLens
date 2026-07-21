@@ -13,6 +13,10 @@ function initials(name){ const p=(name||"").trim().split(/\s+/); return ((p[0]?.
 
 /* ---------- Photos: baked (prominent) + live Wikipedia resolution ---------- */
 const PHOTO_CACHE = {};
+/* persist resolved photo URLs across pages/visits so they load instantly next time */
+try{ Object.assign(PHOTO_CACHE, JSON.parse(localStorage.getItem("loklens_photos")||"{}")); }catch(e){}
+let _photoSaveT=null;
+function _savePhotos(){ try{ clearTimeout(_photoSaveT); _photoSaveT=setTimeout(function(){ try{ localStorage.setItem("loklens_photos", JSON.stringify(PHOTO_CACHE)); }catch(e){} }, 500); }catch(e){} }
 function photoOf(mp){
   if(PHOTO_CACHE[mp.id]) return PHOTO_CACHE[mp.id];
   if(typeof PHOTOS!=="undefined" && PHOTOS[mp.id]) return PHOTOS[mp.id];
@@ -28,32 +32,38 @@ function avatarHTML(mp, px){
   return `<span class="av" data-id="${mp.id}" style="${box}">${inner}</span>`;
 }
 const _normT=s=>(s||"").toLowerCase().replace(/_/g," ").trim();
+function _setImg(id, src){
+  document.querySelectorAll('.av[data-id="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]').forEach(function(sp){
+    if(sp.querySelector('img')) return;
+    const ini=initials(sp.textContent);
+    sp.innerHTML='<img src="'+src+'" alt="" loading="lazy" decoding="async" onerror="this.parentNode.textContent=\''+ini+'\';">';
+  });
+}
 async function hydratePhotos(list){
   const need=list.filter(m=>!photoOf(m) && m.wiki_title);
   if(!need.length) return;
   const t2id={}; need.forEach(m=>{ t2id[_normT(m.wiki_title)]=m.id; });
   const titles=[...new Set(need.map(m=>m.wiki_title))];
-  for(let i=0;i<titles.length;i+=50){
-    const batch=titles.slice(i,i+50);
-    const url="https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=pageimages&piprop=thumbnail&pithumbsize=320&titles="+encodeURIComponent(batch.join("|"));
+  const batches=[]; for(let i=0;i<titles.length;i+=50) batches.push(titles.slice(i,i+50));
+  // fetch all batches in PARALLEL, smaller thumbnails, then persist
+  await Promise.all(batches.map(async function(batch){
+    const url="https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=pageimages&piprop=thumbnail&pithumbsize=200&titles="+encodeURIComponent(batch.join("|"));
     try{
       const j=await fetch(url).then(r=>r.json());
       const nm={}; (j.query.normalized||[]).forEach(n=>nm[_normT(n.to)]=_normT(n.from));
       const rd={}; (j.query.redirects||[]).forEach(n=>rd[_normT(n.to)]=_normT(n.from));
-      Object.values(j.query.pages||{}).forEach(p=>{
+      Object.values(j.query.pages||{}).forEach(function(p){
         if(!p.thumbnail) return;
         let k=_normT(p.title);
         if(rd[k]!==undefined) k=rd[k];
         if(nm[k]!==undefined) k=nm[k];
         const id=t2id[k]; if(!id) return;
         PHOTO_CACHE[id]=p.thumbnail.source;
-        document.querySelectorAll('.av[data-id="'+CSS.escape(id)+'"]').forEach(sp=>{
-          const ini=initials(sp.textContent);
-          sp.innerHTML='<img src="'+p.thumbnail.source+'" alt="" loading="lazy" onerror="this.parentNode.textContent=\''+ini+'\';">';
-        });
+        _setImg(id, p.thumbnail.source);
       });
     }catch(e){ /* offline / blocked → keep initials */ }
-  }
+  }));
+  _savePhotos();
 }
 
 /* ---------- Analytics ---------- */
