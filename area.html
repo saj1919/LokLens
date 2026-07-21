@@ -54,6 +54,7 @@
 <script src="ministers.js"></script>
 <script src="mla.js"></script>
 <script src="acmap.js"></script>
+<script src="pins.js"></script>
 <script src="photos.js"></script>
 <script src="common.js"></script>
 <script>
@@ -77,6 +78,9 @@ function autoResolve(pin){
   cur.exactPC=cur.exactAC=null; cur.autoPCs=null; cur.autoACs=null;
   const cp=(typeof CURATED_PINS!=="undefined")?CURATED_PINS[pin]:null;
   if(cp){ cur.state=matchStateName(cp.state)||cur.state; cur.exactPC=cp.pc; cur.exactAC=cp.ac; cur.autoPCs=[cp.pc]; cur.autoACs=[cp.ac]; return; }
+  const gp=(typeof PINS!=="undefined")?PINS[pin]:null;   // full generated map (build_pincode_constituency.py)
+  if(gp && (gp.ac||gp.pc)){ if(gp.state) cur.state=matchStateName(gp.state)||cur.state;
+    if(gp.pc){cur.exactPC=gp.pc;cur.autoPCs=[gp.pc];} if(gp.ac){cur.exactAC=gp.ac;cur.autoACs=[gp.ac];} return; }
   if(!cur.district) return;
   const dk=ncon(cur.district);
   const rows=acmapOf(cur.state).filter(r=>{ const a=ncon(r.district); return a&&(a===dk||a.includes(dk)||dk.includes(a)); });

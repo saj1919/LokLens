@@ -27,6 +27,13 @@ runs directly on GitHub Pages.
   (richest, most cases, highest liabilities).
 - **Find a member** — search by name and filter by **House**, **state**,
   **party** or **occupation** (e.g. list all actor-MPs or all lawyers).
+- **My Area (by PIN code)** — type your pincode and see your full chain of
+  representatives: your exact **MP** and **MLA**, plus CM / Deputy CM / Governor,
+  the state cabinet, Union ministers, and district/local office links. Powered by
+  a pincode→constituency map built by spatially joining ~148k post-office
+  locations against assembly-constituency boundaries (~92% of pincodes resolve to
+  an exact seat; the rest safely show a short district shortlist). Regenerate
+  anytime with `build_pincode_constituency.py` / `run_join.py`.
 - **Photos** — portraits resolved live from Wikipedia, with clean initials as a
   fallback.
 - **Mobile-friendly** — responsive layout down to small phones.
