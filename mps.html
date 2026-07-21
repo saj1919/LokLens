@@ -123,6 +123,7 @@ function renderProfile(){
   html+=block("💰 Assets & liabilities",`<dl class="kv">
      <dt>Total assets</dt><dd>${fmtCrore(m.assets_total_inr)}</dd>
      <dt>Liabilities</dt><dd>${fmtCrore(m.liabilities_inr)}</dd>
+     ${m.fin_source?`<dt>Affidavit source</dt><dd><a class="src-link" href="${m.fin_source}" target="_blank" rel="noopener">MyNeta ↗</a></dd>`:""}
      ${m.businesses&&m.businesses.length?`<dt>Business interests</dt><dd>${m.businesses.map(b=>itemText(b)+srcLink(b.source)).join("<br>")}</dd>`:""}
    </dl>`);
 
